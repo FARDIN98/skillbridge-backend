@@ -1,7 +1,26 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { z } from 'zod';
 
 const prisma = new PrismaClient();
+
+// Validation schemas
+const userStatusSchema = z.object({
+  status: z.enum(['ACTIVE', 'BANNED'], {
+    errorMap: () => ({ message: 'Status must be ACTIVE or BANNED' })
+  })
+});
+
+const getUsersQuerySchema = z.object({
+  role: z.enum(['STUDENT', 'TUTOR', 'ADMIN']).optional(),
+  status: z.enum(['ACTIVE', 'BANNED']).optional(),
+  search: z.string().optional()
+});
+
+const getBookingsQuerySchema = z.object({
+  status: z.enum(['CONFIRMED', 'COMPLETED', 'CANCELLED']).optional(),
+  search: z.string().optional()
+});
 
 /**
  * Get all users
@@ -13,7 +32,9 @@ export const getAllUsers = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { role, status, search } = req.query;
+    // Validate query parameters
+    const validatedQuery = getUsersQuerySchema.parse(req.query);
+    const { role, status, search } = validatedQuery;
 
     // Build filter conditions
     const where: any = {};
@@ -76,6 +97,15 @@ export const getAllUsers = async (
       count: users.length
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        error: 'Validation Error',
+        message: error.errors[0].message,
+        details: error.errors
+      });
+      return;
+    }
+
     console.error('Get all users error:', error);
     res.status(500).json({
       error: 'Internal Server Error',
@@ -95,16 +125,10 @@ export const updateUserStatus = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
 
-    // Validate status
-    if (!['ACTIVE', 'BANNED'].includes(status)) {
-      res.status(400).json({
-        error: 'Bad Request',
-        message: 'Invalid status value. Must be ACTIVE or BANNED'
-      });
-      return;
-    }
+    // Validate request body
+    const validatedData = userStatusSchema.parse(req.body);
+    const { status } = validatedData;
 
     // Check if user exists
     const user = await prisma.user.findUnique({
@@ -146,6 +170,15 @@ export const updateUserStatus = async (
       user: updatedUser
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        error: 'Validation Error',
+        message: error.errors[0].message,
+        details: error.errors
+      });
+      return;
+    }
+
     console.error('Update user status error:', error);
     res.status(500).json({
       error: 'Internal Server Error',
@@ -164,7 +197,9 @@ export const getAllBookings = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { status, search } = req.query;
+    // Validate query parameters
+    const validatedQuery = getBookingsQuerySchema.parse(req.query);
+    const { status, search } = validatedQuery;
 
     // Build filter conditions
     const where: any = {};
@@ -228,6 +263,15 @@ export const getAllBookings = async (
       count: bookings.length
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        error: 'Validation Error',
+        message: error.errors[0].message,
+        details: error.errors
+      });
+      return;
+    }
+
     console.error('Get all bookings error:', error);
     res.status(500).json({
       error: 'Internal Server Error',
