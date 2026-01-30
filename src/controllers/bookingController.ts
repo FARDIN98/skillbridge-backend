@@ -12,6 +12,13 @@ const createBookingSchema = z.object({
   notes: z.string().optional()
 });
 
+// Validation schema for updating booking status
+const updateBookingStatusSchema = z.object({
+  status: z.enum(['CONFIRMED', 'COMPLETED', 'CANCELLED'], {
+    errorMap: () => ({ message: 'Status must be CONFIRMED, COMPLETED, or CANCELLED' })
+  })
+});
+
 /**
  * Create a new booking
  * POST /api/bookings
@@ -293,16 +300,10 @@ export const updateBookingStatus = async (
     }
 
     const { id } = req.params;
-    const { status } = req.body;
 
-    // Validate status
-    if (!['CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(status)) {
-      res.status(400).json({
-        error: 'Bad Request',
-        message: 'Invalid status value'
-      });
-      return;
-    }
+    // Validate request body
+    const validatedData = updateBookingStatusSchema.parse(req.body);
+    const { status } = validatedData;
 
     // Get booking
     const booking = await prisma.booking.findUnique({
@@ -362,6 +363,15 @@ export const updateBookingStatus = async (
       booking: updatedBooking
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        error: 'Validation Error',
+        message: error.errors[0].message,
+        details: error.errors
+      });
+      return;
+    }
+
     console.error('Update booking status error:', error);
     res.status(500).json({
       error: 'Internal Server Error',
