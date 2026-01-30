@@ -1,6 +1,7 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import apiRoutes from './routes/index';
 
 // Load environment variables
 dotenv.config();
@@ -40,6 +41,9 @@ app.get('/api', (req: Request, res: Response) => {
     }
   });
 });
+
+// Mount API routes
+app.use('/api', apiRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
