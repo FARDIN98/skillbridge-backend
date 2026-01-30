@@ -14,6 +14,14 @@ const updateProfileSchema = z.object({
   categories: z.array(z.string()).optional() // Array of category IDs
 });
 
+// Validation schema for availability update
+const updateAvailabilitySchema = z.object({
+  availability: z.any({
+    required_error: 'Availability is required',
+    invalid_type_error: 'Availability must be an object'
+  })
+});
+
 /**
  * Get all tutors with filters
  * GET /api/tutors?category=&minRating=&maxPrice=&search=
@@ -309,7 +317,9 @@ export const updateAvailability = async (
       return;
     }
 
-    const { availability } = req.body;
+    // Validate request body
+    const validatedData = updateAvailabilitySchema.parse(req.body);
+    const { availability } = validatedData;
 
     const profile = await prisma.tutorProfile.update({
       where: { userId: req.user.userId },
@@ -321,6 +331,15 @@ export const updateAvailability = async (
       profile
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        error: 'Validation Error',
+        message: error.errors[0].message,
+        details: error.errors
+      });
+      return;
+    }
+
     console.error('Update availability error:', error);
     res.status(500).json({
       error: 'Internal Server Error',
