@@ -8,8 +8,18 @@ const prisma = new PrismaClient();
 const categorySchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   description: z.string().optional(),
-  slug: z.string().min(2, 'Slug must be at least 2 characters').regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens')
+  slug: z.string().min(2, 'Slug must be at least 2 characters').regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens').optional()
 });
+
+// Helper function to generate slug from name
+const generateSlug = (name: string): string => {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-'); // Replace multiple hyphens with single hyphen
+};
 
 /**
  * Get all categories
@@ -58,12 +68,15 @@ export const createCategory = async (
     // Validate request body
     const validatedData = categorySchema.parse(req.body);
 
+    // Auto-generate slug from name if not provided
+    const slug = validatedData.slug || generateSlug(validatedData.name);
+
     // Check if category with same name or slug exists
     const existingCategory = await prisma.category.findFirst({
       where: {
         OR: [
           { name: validatedData.name },
-          { slug: validatedData.slug }
+          { slug: slug }
         ]
       }
     });
@@ -78,7 +91,10 @@ export const createCategory = async (
 
     // Create category
     const category = await prisma.category.create({
-      data: validatedData
+      data: {
+        ...validatedData,
+        slug
+      }
     });
 
     res.status(201).json({
