@@ -123,9 +123,29 @@ export const getTutors = async (req: Request, res: Response): Promise<void> => {
       });
     }
 
+    // Transform tutors to match frontend interface
+    const transformedTutors = tutors
+      .filter(tutor => tutor.tutorProfile) // Only include tutors with profiles
+      .map(tutor => ({
+        id: tutor.tutorProfile!.id,
+        userId: tutor.id,
+        bio: tutor.tutorProfile!.bio || null,
+        hourlyRate: tutor.tutorProfile!.hourlyRate || 0,
+        subjects: tutor.tutorProfile!.subjects || [],
+        experience: tutor.tutorProfile!.experience || 0,
+        rating: tutor.tutorProfile!.rating || 0,
+        reviewCount: tutor.tutorProfile!.reviewCount || 0,
+        user: {
+          id: tutor.id,
+          name: tutor.name || 'Unknown',
+          email: tutor.email
+        },
+        categories: tutor.tutorProfile!.categories || []
+      }));
+
     res.status(200).json({
-      tutors,
-      count: tutors.length
+      tutors: transformedTutors,
+      count: transformedTutors.length
     });
   } catch (error) {
     console.error('Get tutors error:', error);
