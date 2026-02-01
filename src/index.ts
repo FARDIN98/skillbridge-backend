@@ -37,7 +37,8 @@ app.get('/api', (req: Request, res: Response) => {
       bookings: '/api/bookings',
       reviews: '/api/reviews',
       categories: '/api/categories',
-      admin: '/api/admin'
+      admin: '/api/admin',
+      errors: '/api/errors'
     }
   });
 });
