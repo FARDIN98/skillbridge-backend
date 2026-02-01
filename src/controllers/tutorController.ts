@@ -214,6 +214,49 @@ export const getTutorById = async (
 };
 
 /**
+ * Get current tutor's profile
+ * GET /api/tutors/profile
+ * Requires authentication and TUTOR role
+ */
+export const getProfile = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Not authenticated'
+      });
+      return;
+    }
+
+    const profile = await prisma.tutorProfile.findUnique({
+      where: { userId: req.user.userId },
+      include: {
+        categories: {
+          select: {
+            id: true,
+            name: true,
+            slug: true
+          }
+        }
+      }
+    });
+
+    res.status(200).json({
+      tutorProfile: profile
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to get profile'
+    });
+  }
+};
+
+/**
  * Update tutor profile
  * PUT /api/tutors/profile
  * Requires authentication and TUTOR role
