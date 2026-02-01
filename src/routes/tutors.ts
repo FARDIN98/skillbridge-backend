@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   getTutors,
   getTutorById,
+  getProfile,
   updateProfile,
   updateAvailability
 } from '../controllers/tutorController';
@@ -16,6 +17,13 @@ const router = Router();
  * Public route
  */
 router.get('/', getTutors);
+
+/**
+ * GET /api/tutors/profile
+ * Get current tutor's profile
+ * Requires authentication and TUTOR role
+ */
+router.get('/profile', authMiddleware, isTutor, getProfile);
 
 /**
  * GET /api/tutors/:id
