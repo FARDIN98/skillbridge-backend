@@ -321,10 +321,29 @@ export const updateAvailability = async (
     const validatedData = updateAvailabilitySchema.parse(req.body);
     const { availability } = validatedData;
 
-    const profile = await prisma.tutorProfile.update({
-      where: { userId: req.user.userId },
-      data: { availability }
+    // Check if tutor profile exists
+    const existingProfile = await prisma.tutorProfile.findUnique({
+      where: { userId: req.user.userId }
     });
+
+    let profile;
+
+    if (existingProfile) {
+      // Update existing profile
+      profile = await prisma.tutorProfile.update({
+        where: { userId: req.user.userId },
+        data: { availability }
+      });
+    } else {
+      // Create new profile with availability
+      profile = await prisma.tutorProfile.create({
+        data: {
+          userId: req.user.userId,
+          hourlyRate: 0,
+          availability
+        }
+      });
+    }
 
     res.status(200).json({
       message: 'Availability updated successfully',
