@@ -22,9 +22,11 @@ enum UserStatus {
 }
 
 enum BookingStatus {
-  CONFIRMED
-  COMPLETED
-  CANCELLED
+  PENDING      // Awaiting tutor approval
+  CONFIRMED    // Tutor approved
+  REJECTED     // Tutor declined
+  COMPLETED    // Session finished
+  CANCELLED    // Either party cancelled
 }
 
 model User {
@@ -87,7 +89,8 @@ model Booking {
   tutorId   String
   dateTime  DateTime
   duration  Int           @default(60) // Duration in minutes
-  status    BookingStatus @default(CONFIRMED)
+  status    BookingStatus @default(PENDING) // Default to PENDING (awaiting approval)
+  subject   String?       // Subject/topic for the session
   notes     String?       @db.Text
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
@@ -100,6 +103,7 @@ model Booking {
   @@index([studentId])
   @@index([tutorId])
   @@index([dateTime])
+  @@index([status]) // Index for filtering by status
   @@map("bookings")
 }
 

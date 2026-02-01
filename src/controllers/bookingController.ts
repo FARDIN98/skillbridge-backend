@@ -9,14 +9,16 @@ const createBookingSchema = z.object({
   tutorId: z.string().uuid('Invalid tutor ID'),
   dateTime: z.string().datetime('Invalid date time format'),
   duration: z.number().positive('Duration must be positive').default(60),
-  notes: z.string().optional()
+  subject: z.string().optional(),
+  notes: z.string().min(1, 'Message is required').optional()
 });
 
 // Validation schema for updating booking status
 const updateBookingStatusSchema = z.object({
-  status: z.enum(['CONFIRMED', 'COMPLETED', 'CANCELLED'], {
-    errorMap: () => ({ message: 'Status must be CONFIRMED, COMPLETED, or CANCELLED' })
-  })
+  action: z.enum(['approve', 'reject', 'cancel', 'complete'], {
+    errorMap: () => ({ message: 'Action must be approve, reject, cancel, or complete' })
+  }),
+  reason: z.string().optional() // Optional reason for rejection/cancellation
 });
 
 /**
@@ -69,6 +71,7 @@ export const createBooking = async (
         tutorId: validatedData.tutorId,
         dateTime: new Date(validatedData.dateTime),
         duration: validatedData.duration,
+        subject: validatedData.subject,
         notes: validatedData.notes
       },
       include: {
@@ -96,7 +99,7 @@ export const createBooking = async (
     });
 
     res.status(201).json({
-      message: 'Booking created successfully',
+      message: 'Booking request sent! Awaiting tutor approval.',
       booking
     });
   } catch (error) {
@@ -285,6 +288,12 @@ export const getBookingById = async (
  * Update booking status
  * PATCH /api/bookings/:id/status
  * Requires authentication
+ *
+ * Actions:
+ * - approve: PENDING → CONFIRMED (tutor only)
+ * - reject: PENDING → REJECTED (tutor only)
+ * - cancel: PENDING/CONFIRMED → CANCELLED (student or tutor)
+ * - complete: CONFIRMED → COMPLETED (tutor only)
  */
 export const updateBookingStatus = async (
   req: Request,
@@ -303,7 +312,7 @@ export const updateBookingStatus = async (
 
     // Validate request body
     const validatedData = updateBookingStatusSchema.parse(req.body);
-    const { status } = validatedData;
+    const { action, reason } = validatedData;
 
     // Get booking
     const booking = await prisma.booking.findUnique({
@@ -318,28 +327,140 @@ export const updateBookingStatus = async (
       return;
     }
 
-    // Check permissions
-    // Students can cancel, tutors can mark as completed
-    if (status === 'CANCELLED' && booking.studentId !== req.user.userId) {
-      res.status(403).json({
-        error: 'Forbidden',
-        message: 'Only students can cancel bookings'
-      });
-      return;
-    }
+    let newStatus: string;
+    let message: string;
+    let updateData: any = {};
 
-    if (status === 'COMPLETED' && booking.tutorId !== req.user.userId) {
-      res.status(403).json({
-        error: 'Forbidden',
-        message: 'Only tutors can mark bookings as completed'
-      });
-      return;
+    // Handle different actions
+    switch (action) {
+      case 'approve':
+        // Only tutor can approve
+        if (booking.tutorId !== req.user.userId) {
+          res.status(403).json({
+            error: 'Forbidden',
+            message: 'Only the tutor can approve bookings'
+          });
+          return;
+        }
+
+        // Can only approve PENDING bookings
+        if (booking.status !== 'PENDING') {
+          res.status(400).json({
+            error: 'Bad Request',
+            message: `Cannot approve booking with status ${booking.status}`
+          });
+          return;
+        }
+
+        newStatus = 'CONFIRMED';
+        message = 'Booking approved successfully';
+        updateData = { status: newStatus };
+        break;
+
+      case 'reject':
+        // Only tutor can reject
+        if (booking.tutorId !== req.user.userId) {
+          res.status(403).json({
+            error: 'Forbidden',
+            message: 'Only the tutor can reject bookings'
+          });
+          return;
+        }
+
+        // Can only reject PENDING bookings
+        if (booking.status !== 'PENDING') {
+          res.status(400).json({
+            error: 'Bad Request',
+            message: `Cannot reject booking with status ${booking.status}`
+          });
+          return;
+        }
+
+        newStatus = 'REJECTED';
+        message = 'Booking rejected';
+        // If reason provided, append to notes
+        updateData = {
+          status: newStatus,
+          notes: reason ? `${booking.notes ? booking.notes + '\n\n' : ''}[REJECTION REASON]\n${reason}` : booking.notes
+        };
+        break;
+
+      case 'cancel':
+        // Student or tutor can cancel
+        const isStudent = booking.studentId === req.user.userId;
+        const isTutor = booking.tutorId === req.user.userId;
+
+        if (!isStudent && !isTutor) {
+          res.status(403).json({
+            error: 'Forbidden',
+            message: 'Only the student or tutor can cancel this booking'
+          });
+          return;
+        }
+
+        // Can only cancel PENDING or CONFIRMED bookings
+        if (booking.status !== 'PENDING' && booking.status !== 'CONFIRMED') {
+          res.status(400).json({
+            error: 'Bad Request',
+            message: `Cannot cancel booking with status ${booking.status}`
+          });
+          return;
+        }
+
+        newStatus = 'CANCELLED';
+        message = 'Booking cancelled successfully';
+        // If reason provided, append to notes
+        updateData = {
+          status: newStatus,
+          notes: reason ? `${booking.notes ? booking.notes + '\n\n' : ''}[CANCELLATION REASON]\n${reason}` : booking.notes
+        };
+        break;
+
+      case 'complete':
+        // Only tutor can mark as completed
+        if (booking.tutorId !== req.user.userId) {
+          res.status(403).json({
+            error: 'Forbidden',
+            message: 'Only the tutor can mark bookings as completed'
+          });
+          return;
+        }
+
+        // Can only complete CONFIRMED bookings
+        if (booking.status !== 'CONFIRMED') {
+          res.status(400).json({
+            error: 'Bad Request',
+            message: `Cannot complete booking with status ${booking.status}`
+          });
+          return;
+        }
+
+        // Optional: Check if booking time has passed
+        if (new Date() < booking.dateTime) {
+          res.status(400).json({
+            error: 'Bad Request',
+            message: 'Cannot mark booking as completed before the scheduled time'
+          });
+          return;
+        }
+
+        newStatus = 'COMPLETED';
+        message = 'Booking marked as completed';
+        updateData = { status: newStatus };
+        break;
+
+      default:
+        res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid action'
+        });
+        return;
     }
 
     // Update booking
     const updatedBooking = await prisma.booking.update({
       where: { id },
-      data: { status },
+      data: updateData,
       include: {
         student: {
           select: {
@@ -352,14 +473,20 @@ export const updateBookingStatus = async (
           select: {
             id: true,
             name: true,
-            email: true
+            email: true,
+            tutorProfile: {
+              select: {
+                hourlyRate: true,
+                subjects: true
+              }
+            }
           }
         }
       }
     });
 
     res.status(200).json({
-      message: 'Booking status updated successfully',
+      message,
       booking: updatedBooking
     });
   } catch (error) {
