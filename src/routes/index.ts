@@ -6,6 +6,7 @@ import reviewRoutes from './reviews';
 import categoryRoutes from './categories';
 import adminRoutes from './admin';
 import errorRoutes from './errors';
+import userRoutes from './users';
 
 const router = Router();
 
@@ -17,6 +18,7 @@ router.use('/reviews', reviewRoutes);
 router.use('/categories', categoryRoutes);
 router.use('/admin', adminRoutes);
 router.use('/errors', errorRoutes);
+router.use('/users', userRoutes);
 
 // Health check for API
 router.get('/health', (req, res) => {
