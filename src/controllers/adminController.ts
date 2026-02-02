@@ -243,13 +243,19 @@ export const getAllBookings = async (
           select: {
             id: true,
             name: true,
-            email: true
+            email: true,
+            tutorProfile: {
+              select: {
+                hourlyRate: true
+              }
+            }
           }
         },
         review: {
           select: {
             id: true,
-            rating: true
+            rating: true,
+            comment: true
           }
         }
       },
@@ -340,33 +346,48 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
       return sum + hourlyRate * hours;
     }, 0);
 
+    // Get user counts by role for easy access
+    const roleStats = userStats.reduce(
+      (acc, stat) => {
+        acc[stat.role.toLowerCase()] = stat._count;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    // Get booking counts by status for easy access
+    const statusStats = bookingStats.reduce(
+      (acc, stat) => {
+        acc[stat.status.toLowerCase()] = stat._count;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    // Count active tutors (tutors with at least one booking)
+    const activeTutors = await prisma.tutorProfile.count({
+      where: {
+        user: {
+          tutorBookings: {
+            some: {}
+          }
+        }
+      }
+    });
+
     res.status(200).json({
-      users: {
-        total: totalUsers,
-        active: activeUsers,
-        banned: bannedUsers,
-        byRole: userStats.reduce(
-          (acc, stat) => {
-            acc[stat.role.toLowerCase()] = stat._count;
-            return acc;
-          },
-          {} as Record<string, number>
-        )
-      },
-      bookings: {
-        total: totalBookings,
-        byStatus: bookingStats.reduce(
-          (acc, stat) => {
-            acc[stat.status.toLowerCase()] = stat._count;
-            return acc;
-          },
-          {} as Record<string, number>
-        )
-      },
-      tutors: totalTutors,
-      reviews: totalReviews,
-      categories: totalCategories,
-      revenue: totalRevenue
+      totalUsers,
+      totalTutors,
+      totalStudents: roleStats.student || 0,
+      totalBookings,
+      totalRevenue,
+      activeTutors,
+      bookingsByStatus: {
+        pending: statusStats.pending || 0,
+        confirmed: statusStats.confirmed || 0,
+        completed: statusStats.completed || 0,
+        cancelled: statusStats.cancelled || 0
+      }
     });
   } catch (error) {
     console.error('Get stats error:', error);
