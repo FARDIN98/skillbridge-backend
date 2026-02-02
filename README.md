@@ -8,8 +8,6 @@ Backend API for the SkillBridge tutoring platform built with Node.js, Express, a
 - **Framework**: Express.js
 - **Database**: Neon PostgreSQL
 - **ORM**: Prisma
-- **Authentication**: JWT (jsonwebtoken)
-- **Password Hashing**: bcryptjs
 - **Type Safety**: TypeScript
 
 ## Prerequisites
@@ -25,34 +23,6 @@ Backend API for the SkillBridge tutoring platform built with Node.js, Express, a
 ```bash
 npm install
 ```
-
-### 2. Environment Setup
-
-Copy the example environment file and configure your variables:
-
-```bash
-cp .env.example .env
-```
-
-Update the `.env` file with your configuration:
-
-```env
-# Database - Neon PostgreSQL
-DATABASE_URL="your-neon-database-url"
-
-# Neon MCP Server (Optional - for AI-assisted database management)
-NEON_API_KEY="your-neon-api-key"
-
-# JWT
-JWT_SECRET="your-secret-key"
-JWT_EXPIRES_IN="24h"
-
-# Server
-PORT=5000
-NODE_ENV="development"
-
-# Frontend URL (for CORS)
-FRONTEND_URL="http://localhost:3000"
 ```
 
 ### 3. Database Setup
@@ -69,11 +39,7 @@ Run database migrations:
 npm run prisma:migrate
 ```
 
-Seed the database (optional):
 
-```bash
-npm run seed
-```
 
 Open Prisma Studio to view your data:
 
@@ -137,17 +103,6 @@ The database includes the following models:
 
 See [prisma/schema.prisma](./prisma/schema.prisma) for detailed schema.
 
-## Neon MCP Server Integration
-
-This project includes Neon MCP Server configuration for AI-assisted database management. This allows you to interact with your database using natural language through AI assistants like Claude Code.
-
-### Setup
-
-1. Get your Neon API key from the [Neon Console](https://console.neon.tech/app/settings/api-keys)
-2. Add it to your `.env` file as `NEON_API_KEY`
-3. The MCP configuration is already set up in [mcp.json](./mcp.json)
-
-For detailed setup instructions and usage examples, see [MCP_SETUP.md](./MCP_SETUP.md).
 
 ## Project Structure
 
@@ -157,13 +112,10 @@ skillbridge-backend/
 │   └── index.ts          # Main application entry point
 ├── prisma/
 │   ├── schema.prisma     # Database schema
-│   └── seed.ts           # Database seeding script
-├── mcp.json              # MCP server configuration
 ├── .env                  # Environment variables (not in git)
 ├── .env.example          # Environment variables template
 ├── package.json          # Dependencies and scripts
 ├── tsconfig.json         # TypeScript configuration
-├── MCP_SETUP.md          # Neon MCP Server documentation
 └── README.md             # This file
 ```
 
@@ -208,13 +160,3 @@ Apply migrations to production:
 npx prisma migrate deploy
 ```
 
-## Contributing
-
-1. Create a new branch for your feature
-2. Make your changes
-3. Test your changes thoroughly
-4. Submit a pull request
-
-## License
-
-ISC
